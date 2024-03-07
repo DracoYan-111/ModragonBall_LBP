@@ -5,5 +5,5 @@ Modragon ball Liquidity bootstrap pool contracts repository
 ## Branch introduction
 
 ---
-### Main: Genesis version
-### review-code: Review version
+### genesis-code: Genesis contracts version
+### review-code: Review contracts version
