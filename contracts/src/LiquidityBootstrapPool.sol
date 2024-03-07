@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.23;
 
 import {WeightedMathLib} from "weighted-math-lib/WeightedMathLib.sol";
@@ -8,7 +8,6 @@ import {MerkleProofLib} from "solady/src/utils/MerkleProofLib.sol";
 import {LibString} from "solady/src/utils/LibString.sol";
 import {Clone} from "solady/src/utils/Clone.sol";
 
-import {ISablierV2LockupLinear} from "v2-core/src/interfaces/ISablierV2LockupLinear.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Broker, LockupLinear, IERC20} from "v2-core/src/types/DataTypes.sol";
 import {ud60x18} from "@prb/math/src/UD60x18.sol";
@@ -16,7 +15,6 @@ import {ud60x18} from "@prb/math/src/UD60x18.sol";
 import {LiquidityBootstrapLib, Pool} from "./utils/LiquidityBootstrapLib.sol";
 import {FixedPointMathLib, Treasury} from "./Treasury.sol";
 import {Pausable} from "./utils/Pausable.sol";
-
 
 contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// -----------------------------------------------------------------------
@@ -65,6 +63,9 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
     /// @dev Error thrown when an address is not allowed to call a function.
     error CallerDisallowed();
+
+    /// @dev Error thrown when the sender is not the recipient.
+    error RecipientNotSender();
 
     /// -----------------------------------------------------------------------
     /// Events
@@ -279,8 +280,6 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         return whitelistMerkleRoot() != 0;
     }
 
-    ISablierV2LockupLinear public immutable SABLIER;
-
     /// -----------------------------------------------------------------------
     /// Modifiers
     /// -----------------------------------------------------------------------
@@ -314,21 +313,21 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         _;
     }
 
-    /**
-     *
-     *  CONSTRUCTOR & INITIALIZATION
-     *
-     */
-
-    /**
-     * @notice Initializes the contract with immutable variables
-     * @param _sablier is the Sablier contract
-     */
-    constructor(address _sablier) {
-        require(_sablier != address(0));
-
-        SABLIER = ISablierV2LockupLinear(_sablier);
+    /// @notice Modifier to check whether recipient is consistent with sender.
+    /// @dev This modifier recipient checks whether it is consistent with sender.
+    /// @param recipient The address to receive the shares.
+    modifier recipientIsSender(address recipient) virtual {
+        if (msg.sender != recipient) {
+            revert RecipientNotSender();
+        }
+        _;
     }
+
+    /**
+     *
+     * INITIALIZATION
+     *
+     */
 
     /// -----------------------------------------------------------------------
     /// Buy Logic
@@ -345,14 +344,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 assetsIn,
         uint256 minSharesOut,
         address recipient
-    )
-        external
-        virtual
-        returns (uint256 sharesOut)
-    {
-        return swapExactAssetsForShares(
-            assetsIn, minSharesOut, recipient, address(0), MerkleProofLib.emptyProof()
-        );
+    ) external virtual returns (uint256 sharesOut) {
+        return swapExactAssetsForShares(assetsIn, minSharesOut, recipient, address(0), MerkleProofLib.emptyProof());
     }
 
     /// @notice Swap a specific number of shares for a maximum amount of assets.
@@ -366,14 +359,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 sharesOut,
         uint256 maxAssetsIn,
         address recipient
-    )
-        external
-        virtual
-        returns (uint256 assetsIn)
-    {
-        return swapAssetsForExactShares(
-            sharesOut, maxAssetsIn, recipient, address(0), MerkleProofLib.emptyProof()
-        );
+    ) external virtual returns (uint256 assetsIn) {
+        return swapAssetsForExactShares(sharesOut, maxAssetsIn, recipient, address(0), MerkleProofLib.emptyProof());
     }
 
     /// @notice Swap a specific amount of assets for a minimum number of shares with a referrer.
@@ -390,14 +377,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 minSharesOut,
         address recipient,
         address referrer
-    )
-        external
-        virtual
-        returns (uint256 sharesOut)
-    {
-        return swapExactAssetsForShares(
-            assetsIn, minSharesOut, recipient, referrer, MerkleProofLib.emptyProof()
-        );
+    ) external virtual returns (uint256 sharesOut) {
+        return swapExactAssetsForShares(assetsIn, minSharesOut, recipient, referrer, MerkleProofLib.emptyProof());
     }
 
     /// @notice Swap a specific number of shares for a maximum amount of assets with a referrer.
@@ -414,14 +395,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 maxAssetsIn,
         address recipient,
         address referrer
-    )
-        external
-        virtual
-        returns (uint256 assetsIn)
-    {
-        return swapAssetsForExactShares(
-            sharesOut, maxAssetsIn, recipient, referrer, MerkleProofLib.emptyProof()
-        );
+    ) external virtual returns (uint256 assetsIn) {
+        return swapAssetsForExactShares(sharesOut, maxAssetsIn, recipient, referrer, MerkleProofLib.emptyProof());
     }
 
     /// @notice Swap a specific amount of assets for a minimum number of shares with a referrer and Merkle proof.
@@ -440,15 +415,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         address recipient,
         address referrer,
         bytes32[] memory proof
-    )
-        public
-        virtual
-        whenNotPaused
-        whenSaleActive
-        onlyWhitelisted(proof)
-        nonReentrant
-        returns (uint256 sharesOut)
-    {
+    ) public virtual whenNotPaused whenSaleActive onlyWhitelisted(proof) nonReentrant returns (uint256 sharesOut) {
         Pool memory pool = args();
 
         uint256 swapFees = assetsIn.mulWad(swapFee());
@@ -458,9 +425,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
         if (sharesOut < minSharesOut) revert SlippageExceeded();
 
-        _swapAssetsForShares(
-            recipient, referrer, assetsIn, sharesOut, pool.assets, pool.shares, swapFees
-        );
+        _swapAssetsForShares(recipient, referrer, assetsIn, sharesOut, pool.assets, pool.shares, swapFees);
     }
 
     /// @notice Swap a specific number of shares for a maximum amount of assets with a referrer and Merkle proof.
@@ -479,15 +444,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         address recipient,
         address referrer,
         bytes32[] memory proof
-    )
-        public
-        virtual
-        whenNotPaused
-        whenSaleActive
-        onlyWhitelisted(proof)
-        nonReentrant
-        returns (uint256 assetsIn)
-    {
+    ) public virtual whenNotPaused whenSaleActive onlyWhitelisted(proof) nonReentrant returns (uint256 assetsIn) {
         Pool memory pool = args();
 
         assetsIn = pool.previewAssetsIn(sharesOut);
@@ -497,9 +454,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
         if (assetsIn > maxAssetsIn) revert SlippageExceeded();
 
-        _swapAssetsForShares(
-            recipient, referrer, assetsIn, sharesOut, pool.assets, pool.shares, swapFees
-        );
+        _swapAssetsForShares(recipient, referrer, assetsIn, sharesOut, pool.assets, pool.shares, swapFees);
     }
 
     function _swapAssetsForShares(
@@ -510,10 +465,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 assets,
         uint256 shares,
         uint256 swapFees
-    )
-        internal
-        virtual
-    {
+    ) internal virtual recipientIsSender(recipient) {
         if (assets + assetsIn - swapFees >= maxTotalAssetsIn()) {
             revert AssetsInExceeded();
         }
@@ -556,13 +508,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 sharesIn,
         uint256 minAssetsOut,
         address recipient
-    )
-        external
-        virtual
-        returns (uint256 assetsOut)
-    {
-        return
-            swapExactSharesForAssets(sharesIn, minAssetsOut, recipient, MerkleProofLib.emptyProof());
+    ) external virtual returns (uint256 assetsOut) {
+        return swapExactSharesForAssets(sharesIn, minAssetsOut, recipient, MerkleProofLib.emptyProof());
     }
 
     /// @notice Swap a specific number of shares for a maximum amount of assets.
@@ -576,13 +523,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 assetsOut,
         uint256 maxSharesIn,
         address recipient
-    )
-        external
-        virtual
-        returns (uint256 sharesIn)
-    {
-        return
-            swapSharesForExactAssets(assetsOut, maxSharesIn, recipient, MerkleProofLib.emptyProof());
+    ) external virtual returns (uint256 sharesIn) {
+        return swapSharesForExactAssets(assetsOut, maxSharesIn, recipient, MerkleProofLib.emptyProof());
     }
 
     /// @notice Swap a specific number of shares for a minimum amount of assets.
@@ -662,10 +604,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 assets,
         uint256 shares,
         uint256 swapFees
-    )
-        internal
-        virtual
-    {
+    ) internal virtual recipientIsSender(recipient) {
         if (assets >= maxTotalAssetsIn()) {
             revert AssetsInExceeded();
         }
@@ -702,13 +641,6 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 totalAssetsMinusFees = totalAssets.rawSub(platformFees).rawSub(totalReferred);
 
         if (totalAssets != 0) {
-            // Transfer and distribute fees
-            asset().safeTransfer(platform(), platformFees + totalSwapFeesAsset);
-            share().safeTransfer(platform(), totalSwapFeesShare);
-            Treasury(platform()).distributeFee(
-                asset(), platformFees, totalSwapFeesAsset, share(), totalSwapFeesShare
-            );
-
             // Transfer asset
             asset().safeTransfer(manager(), totalAssetsMinusFees);
         }
@@ -721,8 +653,6 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         }
 
         closed = true;
-
-        share().safeApprove(address(SABLIER), totalShares);
 
         emit Close(totalAssetsMinusFees, platformFees, totalSwapFeesAsset, totalSwapFeesShare);
     }
@@ -740,34 +670,23 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// @param recipient The address to receive redeemed shares and assets.
     /// @param referred A boolean indicating whether the user has been referred.
     /// @return shares The number of shares redeemed.
-    function redeem(address recipient, bool referred) external virtual returns (uint256 shares) {
+    function redeem(
+        address recipient,
+        bool referred
+    ) external virtual recipientIsSender(recipient) returns (uint256 shares) {
         if (!closed) revert RedeemingDisallowed();
 
-        uint256 streamID;
+        shares = purchasedShares[msg.sender];
 
-        if (vestShares() && vestEnd() > block.timestamp) {
-            shares = purchasedShares[msg.sender];
-            delete purchasedShares[msg.sender];
+        delete purchasedShares[msg.sender];
 
-            LockupLinear.CreateWithRange memory params;
+        share().safeTransfer(msg.sender, shares);
+        
+        shares = purchasedShares[msg.sender];
 
-            params.sender = manager();
-            params.recipient = msg.sender;
-            params.totalAmount = uint128(shares);
-            params.asset = IERC20(share());
-            params.cancelable = false;
-            params.range =
-                LockupLinear.Range({ start: uint40(saleEnd()), cliff: vestCliff(), end: vestEnd() });
-            params.broker = Broker(address(0), ud60x18(0));
+        delete purchasedShares[msg.sender];
 
-            streamID = SABLIER.createWithRange(params);
-        } else {
-            shares = purchasedShares[msg.sender];
-
-            delete purchasedShares[msg.sender];
-
-            share().safeTransfer(msg.sender, shares);
-        }
+        share().safeTransfer(msg.sender, shares);
 
         if (referred && referrerFee() != 0) {
             uint256 assets = referredAssets[msg.sender];
@@ -778,7 +697,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         }
 
         if (shares != 0) {
-            emit Redeem(msg.sender, streamID, shares);
+            emit Redeem(msg.sender, block.timestamp, shares);
         }
     }
 
@@ -797,6 +716,19 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         _togglePause();
     }
 
+    /// @notice Emergency withdrawal and pause function.
+    /// @dev This method is used for emergency withdrawals from the project side.
+    /// @param recipient The address to receive redeemed shares and assets.
+    function emergencyWithdrawal(address recipient) external {
+        if (msg.sender != manager()) {
+            revert CallerDisallowed();
+        }
+        if (paused == false) _togglePause();
+
+        share().safeTransfer(recipient, share().balanceOf(address(this)));
+        asset().safeTransfer(recipient, asset().balanceOf(address(this)));
+    }
+
     /// -----------------------------------------------------------------------
     /// Swap Helper Logic
     /// -----------------------------------------------------------------------
@@ -806,20 +738,21 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// and share reserves, weights, and other parameters.
     /// @return pool A struct containing the pool configuration.
     function args() public view virtual returns (Pool memory) {
-        return Pool(
-            asset(),
-            share(),
-            asset().balanceOf(address(this)).rawSub(totalSwapFeesAsset),
-            share().balanceOf(address(this)).rawSub(totalSwapFeesShare),
-            virtualAssets(),
-            virtualShares(),
-            weightStart(),
-            weightEnd(),
-            saleStart(),
-            saleEnd(),
-            totalPurchased,
-            maxSharePrice()
-        );
+        return
+            Pool(
+                asset(),
+                share(),
+                asset().balanceOf(address(this)).rawSub(totalSwapFeesAsset),
+                share().balanceOf(address(this)).rawSub(totalSwapFeesShare),
+                virtualAssets(),
+                virtualShares(),
+                weightStart(),
+                weightEnd(),
+                saleStart(),
+                saleEnd(),
+                totalPurchased,
+                maxSharePrice()
+            );
     }
 
     /// @notice Get the reserves and weights of the pool.
@@ -833,12 +766,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         external
         view
         virtual
-        returns (
-            uint256 assetReserve,
-            uint256 shareReserve,
-            uint256 assetWeight,
-            uint256 shareWeight
-        )
+        returns (uint256 assetReserve, uint256 shareReserve, uint256 assetWeight, uint256 shareWeight)
     {
         return args().computeReservesAndWeights();
     }
