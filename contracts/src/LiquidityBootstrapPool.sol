@@ -674,7 +674,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         address recipient,
         bool referred
     ) external virtual recipientIsSender(recipient) returns (uint256 shares) {
-        if (!closed) revert RedeemingDisallowed();
+        if (!closed && block.timestamp < vestEnd() ) revert RedeemingDisallowed();
         
         shares = purchasedShares[msg.sender];
 
