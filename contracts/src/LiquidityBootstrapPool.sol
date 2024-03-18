@@ -462,21 +462,16 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         address referrer,
         uint256 assetsIn,
         uint256 sharesOut,
-        uint256 assets,
+        uint256,
         uint256 shares,
         uint256 swapFees
     ) internal virtual recipientIsSender(recipient) {
-        if (assets + assetsIn - swapFees >= maxTotalAssetsIn()) {
-            revert AssetsInExceeded();
-        }
 
         asset().safeTransferFrom(msg.sender, address(this), assetsIn);
 
         uint256 totalPurchasedAfter = totalPurchased + sharesOut;
 
-        if (totalPurchasedAfter >= maxTotalSharesOut() || totalPurchasedAfter >= shares) {
-            revert SharesOutExceeded();
-        }
+        if (totalPurchasedAfter >= shares) revert SharesOutExceeded();
 
         totalPurchased = totalPurchasedAfter;
 
@@ -601,19 +596,14 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         address recipient,
         uint256 assetsOut,
         uint256 sharesIn,
-        uint256 assets,
+        uint256,
         uint256 shares,
         uint256 swapFees
     ) internal virtual recipientIsSender(recipient) {
-        if (assets >= maxTotalAssetsIn()) {
-            revert AssetsInExceeded();
-        }
 
         uint256 totalPurchasedBefore = totalPurchased;
 
-        if (totalPurchasedBefore >= maxTotalSharesOut() || totalPurchasedBefore >= shares) {
-            revert SharesOutExceeded();
-        }
+        if (totalPurchasedBefore >= shares) revert SharesOutExceeded();
 
         purchasedShares[msg.sender] -= sharesIn;
 
@@ -674,8 +664,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         address recipient,
         bool referred
     ) external virtual recipientIsSender(recipient) returns (uint256 shares) {
-        if (!closed && block.timestamp < vestEnd() ) revert RedeemingDisallowed();
-        
+        if (!closed || block.timestamp < vestEnd()) revert RedeemingDisallowed();
+
         shares = purchasedShares[msg.sender];
 
         delete purchasedShares[msg.sender];
