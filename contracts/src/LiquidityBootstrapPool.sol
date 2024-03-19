@@ -69,7 +69,10 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
    /// @dev  Error thrown when the not hava shares to redeem.
     error NoSharesToRedeem();
-    
+
+    /// @dev  Error thrown when the total fee is too large.
+    error TotalFeeTooLarge();
+
     /// @dev  Error thrown when the transfer amount is zero.
     error ZeroAmount();
     /// -----------------------------------------------------------------------
@@ -462,6 +465,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 shares,
         uint256 swapFees
     ) internal virtual recipientIsSender(recipient) {
+        if (swapFee() + referrerFee() >= 1 ether) revert TotalFeeTooLarge();
         if (assetsIn == 0 || sharesOut == 0) revert ZeroAmount();
 
         asset().safeTransferFrom(recipient, address(this), assetsIn);
