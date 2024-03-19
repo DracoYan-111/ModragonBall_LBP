@@ -67,6 +67,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// @dev Error thrown when the sender is not the recipient.
     error RecipientNotSender();
 
+    /// @dev  Error thrown when the transfer amount is zero.
+    error ZeroAmount();
     /// -----------------------------------------------------------------------
     /// Events
     /// -----------------------------------------------------------------------
@@ -463,6 +465,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 shares,
         uint256 swapFees
     ) internal virtual recipientIsSender(recipient) {
+        if (assetsIn == 0 || sharesOut == 0) revert ZeroAmount();
 
         asset().safeTransferFrom(msg.sender, address(this), assetsIn);
 
@@ -597,6 +600,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         uint256 shares,
         uint256 swapFees
     ) internal virtual recipientIsSender(recipient) {
+        if (sharesIn == 0 || assetsOut == 0) revert ZeroAmount();
 
         uint256 totalPurchasedBefore = totalPurchased;
 
