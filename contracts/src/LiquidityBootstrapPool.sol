@@ -103,14 +103,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// @notice Mapping to track the purchased shares for each address.
     mapping(address => uint256) public purchasedShares;
 
-    /// @notice Mapping to track the assets referred by each address.
-    mapping(address => uint256) public referredAssets;
-
     /// @notice The total number of purchased shares in the pool.
     uint256 public totalPurchased;
-
-    /// @notice The total amount of assets referred in the pool.
-    uint256 public totalReferred;
 
     /// @notice The total swap fee amount in asset charged to users.
     uint256 public totalSwapFeesAsset;
@@ -458,7 +452,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
     function _swapAssetsForShares(
         address recipient,
-        address referrer,
+        address,
         uint256 assetsIn,
         uint256 sharesOut,
         uint256,
@@ -467,7 +461,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     ) internal virtual recipientIsSender(recipient) {
         if (assetsIn == 0 || sharesOut == 0) revert ZeroAmount();
 
-        asset().safeTransferFrom(msg.sender, address(this), assetsIn);
+        asset().safeTransferFrom(recipient, address(this), assetsIn);
 
         uint256 totalPurchasedAfter = totalPurchased + sharesOut;
 
@@ -477,15 +471,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
         purchasedShares[recipient] = purchasedShares[recipient].rawAdd(sharesOut);
 
-        if (referrer != address(0) && referrerFee() != 0) {
-            uint256 assetsReferred = assetsIn.mulWad(referrerFee());
-
-            totalReferred += assetsReferred;
-
-            referredAssets[referrer] = referredAssets[referrer].rawAdd(assetsReferred);
-        }
-
-        emit Buy(msg.sender, assetsIn, sharesOut, swapFees);
+        emit Buy(recipient, assetsIn, sharesOut, swapFees);
     }
 
     /// -----------------------------------------------------------------------
@@ -606,13 +592,13 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
         if (totalPurchasedBefore >= shares) revert SharesOutExceeded();
 
-        purchasedShares[msg.sender] -= sharesIn;
+        purchasedShares[recipient] -= sharesIn;
 
         totalPurchased = totalPurchasedBefore.rawSub(sharesIn);
 
         asset().safeTransfer(recipient, assetsOut);
 
-        emit Sell(msg.sender, sharesIn, assetsOut, swapFees);
+        emit Sell(recipient, sharesIn, assetsOut, swapFees);
     }
 
     /// -----------------------------------------------------------------------
@@ -629,7 +615,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
         uint256 totalAssets = asset().balanceOf(address(this)).rawAdd(totalSwapFeesAsset);
         uint256 platformFees = totalAssets.mulWad(platformFee());
-        uint256 totalAssetsMinusFees = totalAssets.rawAdd(platformFees).rawAdd(totalReferred);
+        uint256 totalAssetsMinusFees = totalAssets.rawAdd(platformFees);
 
         if (totalAssets != 0) {
             // Transfer asset
@@ -659,30 +645,21 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// vested shares at any time. Once shares are fully vested, the user can
     /// redeem all of them.
     /// @param recipient The address to receive redeemed shares and assets.
-    /// @param referred A boolean indicating whether the user has been referred.
     /// @return shares The number of shares redeemed.
     function redeem(
         address recipient,
-        bool referred
+        bool
     ) external virtual recipientIsSender(recipient) whenNotRedeemOpen returns (uint256 shares) {
         if (!closed) revert RedeemingDisallowed();
 
-        shares = purchasedShares[msg.sender];
+        shares = purchasedShares[recipient];
 
-        delete purchasedShares[msg.sender];
+        delete purchasedShares[recipient];
 
-        share().safeTransfer(msg.sender, shares);
-
-        if (referred && referrerFee() != 0) {
-            uint256 assets = referredAssets[msg.sender];
-
-            delete referredAssets[msg.sender];
-
-            asset().safeTransfer(recipient, assets);
-        }
+        share().safeTransfer(recipient, shares);
 
         if (shares != 0) {
-            emit Redeem(msg.sender, block.timestamp, shares);
+            emit Redeem(recipient, block.timestamp, shares);
         }
     }
 
