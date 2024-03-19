@@ -67,6 +67,9 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// @dev Error thrown when the sender is not the recipient.
     error RecipientNotSender();
 
+   /// @dev  Error thrown when the not hava shares to redeem.
+    error NoSharesToRedeem();
+    
     /// @dev  Error thrown when the transfer amount is zero.
     error ZeroAmount();
     /// -----------------------------------------------------------------------
@@ -654,13 +657,14 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
 
         shares = purchasedShares[recipient];
 
+        if (shares == 0) revert NoSharesToRedeem();
+
         delete purchasedShares[recipient];
 
         share().safeTransfer(recipient, shares);
 
-        if (shares != 0) {
-            emit Redeem(recipient, block.timestamp, shares);
-        }
+        emit Redeem(recipient, block.timestamp, shares);
+        
     }
 
     /// -----------------------------------------------------------------------
