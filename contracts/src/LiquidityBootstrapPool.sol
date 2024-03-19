@@ -663,8 +663,8 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     function redeem(
         address recipient,
         bool referred
-    ) external virtual recipientIsSender(recipient) returns (uint256 shares) {
-        if (!closed || block.timestamp < vestEnd()) revert RedeemingDisallowed();
+    ) external virtual recipientIsSender(recipient) whenNotRedeemOpen returns (uint256 shares) {
+        if (!closed) revert RedeemingDisallowed();
 
         shares = purchasedShares[msg.sender];
 
@@ -698,6 +698,16 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
         }
 
         _togglePause();
+    }
+
+    /// @notice Toggle the open state of the redeem function.
+    /// @dev This function allows the manager to open and close the redeem function.
+    /// When the redeem is open, redeemable shares
+    function toggleRedeemOpen() external virtual {
+        if (msg.sender != manager()) {
+            revert CallerDisallowed();
+        }
+        _toggleRedeemOpen();
     }
 
     /// @notice Emergency withdrawal and pause function.
