@@ -104,9 +104,6 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// @notice Mapping to track the assets referred by each address.
     mapping(address => uint256) public referredAssets;
 
-    /// @notice Mapping to track the redeemed shares for each address.
-    mapping(address => uint256) public redeemedShares;
-
     /// @notice The total number of purchased shares in the pool.
     uint256 public totalPurchased;
 
