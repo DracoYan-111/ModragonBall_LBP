@@ -281,7 +281,7 @@ contract LiquidityBootstrapPool is Pausable, Clone, ReentrancyGuard {
     /// @dev This modifier checks if the caller's address is whitelisted using a Merkle proof.
     modifier onlyWhitelisted(bytes32[] memory proof) virtual {
         if (whitelisted()) {
-            if (!proof.verify(whitelistMerkleRoot(), keccak256(abi.encodePacked(msg.sender)))) {
+            if (proof.length != 0 && !proof.verify(whitelistMerkleRoot(), keccak256(abi.encodePacked(msg.sender)))) {
                 revert WhitelistProof();
             }
         }
