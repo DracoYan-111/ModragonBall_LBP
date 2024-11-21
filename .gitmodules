@@ -13,3 +13,6 @@
 [submodule "contracts/lib/weighted-math-lib"]
 	path = contracts/lib/weighted-math-lib
 	url = https://github.com/marigoldlabs/weighted-math-lib
+[submodule "contracts/lib/solmate"]
+	path = contracts/lib/solmate
+	url = https://github.com/transmissions11/solmate
