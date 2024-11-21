@@ -91,3 +91,7 @@ bin
 out
 
 solcInputs
+
+
+# Soldeer
+/dependencies

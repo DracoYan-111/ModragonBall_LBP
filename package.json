@@ -64,9 +64,7 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.0.1",
-    "@openzeppelin/contracts-4.9.5": "npm:@openzeppelin/contracts@4.9.5",
     "@openzeppelin/contracts-upgradeable": "^5.0.1",
-    "@openzeppelin/contracts-upgradeable-4.8.0": "npm:@openzeppelin/contracts-upgradeable@4.8.0",
     "@openzeppelin/upgrades-core": "^1.32.2",
     "@prb/math": "^4.0.2",
     "@sablier/v2-core": "^1.1.2",
